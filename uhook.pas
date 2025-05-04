@@ -11,6 +11,8 @@ const WM_HOOK_KEY = WM_USER + 1;
 procedure StartKeyboardHook(wndhandle:cardinal);
 procedure StopKeyboardHook;
 
+Function IsDown:boolean;
+
 implementation
 
 
@@ -27,6 +29,11 @@ var
   HookHandle: HHOOK = 0;
   IsPushingToTalk: Boolean = False;
   NotifyTo:Cardinal;
+
+Function IsDown:boolean;
+begin
+ result:=IsPushingToTalk;
+end;
 
 type
   ULONG_PTR = LongWord;

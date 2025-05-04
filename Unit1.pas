@@ -25,8 +25,6 @@ type
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
-      VirtualKey: Integer);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
