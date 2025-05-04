@@ -36,8 +36,4 @@ object Form1: TForm1
     Left = 32
     Top = 8
   end
-  object ThemeManager1: TThemeManager
-    Left = 24
-    Top = 40
-  end
 end

@@ -14,14 +14,12 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, ThemeMgr,
-  wTime, uhook;
+  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook;
 
 type
   TForm1 = class(TForm)
     Timer1: TTimer;
     Panel1: TPanel;
-    ThemeManager1: TThemeManager;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -34,9 +32,13 @@ type
     Function  IsPTTActive:boolean;
     procedure CreateRigControl;
     procedure KillRigControl;
+
+    procedure AdjustDown;
+
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
+    PTTDown:boolean;
   end;
 
 var
@@ -91,15 +93,24 @@ begin
   end;
 end;
 
+procedure TForm1.AdjustDown;
+begin
+  if (self.PTTDown) then
+  begin
+   if (xGetTickCount >PTTUnti) then
+   begin
+     PTTUnti:=xGetTickCount+round(AddHangTime * 2.5)
+   end else begin
+     PTTUnti:=xGetTickCount+AddHangTime;
+   end;
+  end else PTTUnti := 0;
+
+end;
+
 procedure TForm1.WmKeyboard(var Msg: TMessage);
 begin
- if (msg.WParam = 1) then begin
-  if (xGetTickCount >PTTUnti) then
-    PTTUnti:=xGetTickCount+round(AddHangTime * 2.5)
-  else
-    PTTUnti:=xGetTickCount+AddHangTime;
- end;
-
+  self.PTTDown := msg.WParam = 1;
+  AdjustDown;
 end;
 
 procedure TForm1.KillRigControl;
@@ -166,7 +177,7 @@ procedure TForm1.Timer1Timer(Sender: TObject);
 var needed:boolean;
 begin
   if (OmniRig = nil) or (OmniRig.Rig1.Status <> ST_ONLINE) then Exit;
-
+  AdjustDown;
   needed:=(PTTUnti>xGetTickCount) and (PTTUnti - xGetTickCount < 2000);
 
   if (needed <> ispttActive) then

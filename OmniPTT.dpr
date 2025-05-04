@@ -3,7 +3,8 @@ program OmniPTT;
 uses
   Forms,
   Unit1 in 'Unit1.pas' {Form1},
-  OmniRig_TLB in 'OmniRig_TLB.pas';
+  OmniRig_TLB in 'OmniRig_TLB.pas',
+  uhook in 'uhook.pas';
 
 {$R *.RES}
 

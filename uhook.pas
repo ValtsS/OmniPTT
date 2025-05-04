@@ -74,6 +74,9 @@ begin
         OutputDebugString('Push-to-talk deactivated');
         // Stop transmitting
       end;
+
+      Result := 1;
+      Exit;
     end;
   end;
   Result := CallNextHookEx(HookHandle, nCode, wParam, lParam);
