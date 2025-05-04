@@ -14,7 +14,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, ThemeMgr, uhotkey,
+  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, ThemeMgr,
   wTime, uhook;
 
 type
