@@ -39,6 +39,7 @@ type
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
     PTTDown:boolean;
+    DidIEnable:boolean;
   end;
 
 var
@@ -183,9 +184,14 @@ begin
   if (needed <> ispttActive) then
   begin
     if needed then
-         OmniRig.Rig1.Tx := PM_TX
-    else
+    begin
+         OmniRig.Rig1.Tx := PM_TX;
+         DidIEnable:=true;
+    end
+    else if DidIEnable then begin
          OmniRig.Rig1.Tx := PM_RX;
+         DidIEnable:=false;
+    end;
   end;
 
   if (IsPTTActive) then
