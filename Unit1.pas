@@ -15,18 +15,16 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, ThemeMgr, uhotkey,
-  wTime;
+  wTime, uhook;
 
 type
   TForm1 = class(TForm)
     Timer1: TTimer;
     Panel1: TPanel;
     ThemeManager1: TThemeManager;
-    HotCatcher1: THotCatcher;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure FormShow(Sender: TObject);
     procedure HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
       VirtualKey: Integer);
   private
@@ -34,6 +32,7 @@ type
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
     procedure RigTypeChangeEvent(Sender: TObject; RigNumber: Integer);
 
+    procedure WmKeyboard(var Msg: TMessage); message WM_HOOK_KEY;
     Function  IsPTTActive:boolean;
     procedure CreateRigControl;
     procedure KillRigControl;
@@ -62,6 +61,7 @@ const
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   CreateRigControl;
+  StartKeyboardHook(WindowHandle);
 end;
 
 
@@ -93,29 +93,21 @@ begin
   end;
 end;
 
+procedure TForm1.WmKeyboard(var Msg: TMessage);
+begin
+ if (msg.WParam = 1) then begin
+  if (xGetTickCount >PTTUnti) then
+    PTTUnti:=xGetTickCount+round(AddHangTime * 2.5)
+  else
+    PTTUnti:=xGetTickCount+AddHangTime;
+ end;
+
+end;
 
 procedure TForm1.KillRigControl;
 begin
   try FreeAndNil(OmniRig); except end;
 end;
-
-
-function ModeName(Mode: integer): string;
-begin
-  case Mode of
-    PM_CW_U,
-    PM_CW_L:   Result := 'CW';
-    PM_SSB_U:  Result := 'USB';
-    PM_SSB_L:  Result := 'LSB';
-    PM_DIG_U,
-    PM_DIG_L:  Result := 'DIG';
-    PM_AM:     Result := 'AM';
-    PM_FM:     Result := 'FM';
-    else       Result := 'Unknown';
-    end;
-end;
-
-
 
 
 
@@ -199,25 +191,10 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
+ StopKeyboardHook;
  Timer1.Enabled:=false;
 end;
 
-procedure TForm1.FormShow(Sender: TObject);
-begin
-  HotCatcher1.RegisterKey(HOTKEY_ID, 0, VK_OEM_5);
-end;
-
-procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
-  VirtualKey: Integer);
-begin
- if (HOTKEY_ID=1) then begin
-  if (xGetTickCount >PTTUnti) then
-    PTTUnti:=xGetTickCount+round(AddHangTime * 2.5)
-  else
-    PTTUnti:=xGetTickCount+AddHangTime;
- end;
-
-end;
 
 end.
 

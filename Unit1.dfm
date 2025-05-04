@@ -17,7 +17,6 @@ object Form1: TForm1
   Position = poScreenCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   object Panel1: TPanel
@@ -29,14 +28,6 @@ object Form1: TForm1
     BevelInner = bvLowered
     Caption = 'Panel1'
     TabOrder = 0
-    object HotCatcher1: THotCatcher
-      Left = 72
-      Top = 8
-      Width = 33
-      Height = 33
-      OnHotkey = HotCatcher1Hotkey
-      Color = clRed
-    end
   end
   object Timer1: TTimer
     Enabled = False
