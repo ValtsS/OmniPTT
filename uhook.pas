@@ -57,7 +57,7 @@ begin
     (GetAsyncKeyState(VK_MENU) < 0); // Alt
 end;
 
-
+             
 function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   p: PKBDLLHookStruct;
@@ -69,14 +69,14 @@ begin
     p := PKBDLLHookStruct(lParam);
     if p^.vkCode = VK_PUSH_TO_TALK then
     begin
+      processNormally := IsModifierDown;
       if wParam = WM_KEYDOWN then
       begin
-        if not IsPushingToTalk and not IsModifierDown then
+        if not IsPushingToTalk and not processNormally then
         begin
           IsPushingToTalk := True;
           PostMessage(NotifyTo, WM_HOOK_KEY, 1, 0);
           OutputDebugString('Push-to-talk activated');
-          processNormally := false;
           // Start transmitting
         end;
       end
@@ -85,7 +85,6 @@ begin
         IsPushingToTalk := False;
         PostMessage(NotifyTo, WM_HOOK_KEY, 0, 0);
         OutputDebugString('Push-to-talk deactivated');
-        processNormally := false;
         // Stop transmitting
       end;
 
