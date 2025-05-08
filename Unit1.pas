@@ -206,6 +206,9 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
+ if IsPTTActive then
+  OmniRig.Rig1.Tx := PM_RX;
+  
  StopKeyboardHook;
  Timer1.Enabled:=false;
 end;
