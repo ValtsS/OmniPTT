@@ -48,10 +48,22 @@ type
     dwExtraInfo: ULONG_PTR;
   end;
 
+
+function IsModifierDown: Boolean;
+begin
+  Result :=
+    (GetAsyncKeyState(VK_SHIFT) < 0) or
+    (GetAsyncKeyState(VK_CONTROL) < 0) or
+    (GetAsyncKeyState(VK_MENU) < 0); // Alt
+end;
+
+
 function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
   p: PKBDLLHookStruct;
+  processNormally:boolean;
 begin
+  processNormally := true;
   if nCode = HC_ACTION then
   begin
     p := PKBDLLHookStruct(lParam);
@@ -59,11 +71,12 @@ begin
     begin
       if wParam = WM_KEYDOWN then
       begin
-        if not IsPushingToTalk then
+        if not IsPushingToTalk and not IsModifierDown then
         begin
           IsPushingToTalk := True;
           PostMessage(NotifyTo, WM_HOOK_KEY, 1, 0);
           OutputDebugString('Push-to-talk activated');
+          processNormally := false;
           // Start transmitting
         end;
       end
@@ -72,11 +85,15 @@ begin
         IsPushingToTalk := False;
         PostMessage(NotifyTo, WM_HOOK_KEY, 0, 0);
         OutputDebugString('Push-to-talk deactivated');
+        processNormally := false;
         // Stop transmitting
       end;
 
-      Result := 1;
-      Exit;
+      if not processNormally then begin
+       Result := 1;
+       Exit;
+      end;
+      
     end;
   end;
   Result := CallNextHookEx(HookHandle, nCode, wParam, lParam);
