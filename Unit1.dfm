@@ -4,8 +4,8 @@ object Form1: TForm1
   BorderIcons = [biSystemMenu]
   BorderStyle = bsToolWindow
   Caption = 'OmniRig demo'
-  ClientHeight = 86
-  ClientWidth = 120
+  ClientHeight = 62
+  ClientWidth = 122
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -14,7 +14,7 @@ object Form1: TForm1
   Font.Style = []
   FormStyle = fsStayOnTop
   OldCreateOrder = False
-  Position = poScreenCenter
+  Position = poDefault
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   PixelsPerInch = 96
@@ -22,8 +22,8 @@ object Form1: TForm1
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 120
-    Height = 86
+    Width = 122
+    Height = 62
     Align = alClient
     BevelInner = bvLowered
     Caption = 'Panel1'
