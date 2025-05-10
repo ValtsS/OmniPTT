@@ -15,6 +15,7 @@ object Form1: TForm1
   FormStyle = fsStayOnTop
   OldCreateOrder = False
   Position = poDefault
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   PixelsPerInch = 96

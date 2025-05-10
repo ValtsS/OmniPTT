@@ -14,7 +14,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook;
+  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
+  Registry;
 
 type
   TForm1 = class(TForm)
@@ -23,6 +24,8 @@ type
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure Exit1Click(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -34,7 +37,9 @@ type
     procedure KillRigControl;
 
     procedure AdjustDown;
-
+  protected
+    reg:TRegistry;
+    procedure SavePos;
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -54,13 +59,32 @@ const
   HOTKEY_ID = 1;
   VK_OEM_5 = $DC; // \ key
   AddHangTime = 200;
-
+  Ourkey = '\Software\WNR\OmniPTT\';
 
 //------------------------------------------------------------------------------
 //                  OmniRig object creation and destruction
 //------------------------------------------------------------------------------
 procedure TForm1.FormCreate(Sender: TObject);
+var l,t:integer;
 begin
+  reg:=TRegistry.Create();
+  try
+   reg.RootKey := HKEY_CURRENT_USER;
+   reg.OpenKey(Ourkey, false);
+   l:=reg.ReadInteger('Left');
+   t:=reg.readinteger('Top');
+
+   if ((l <= screen.Width) and (t <= screen.Height))
+   then begin
+    self.Left:=l;
+    self.top:=t;
+   end;
+   
+
+  except
+   FreeAndNil(reg);
+  end; 
+
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
 end;
@@ -208,11 +232,35 @@ procedure TForm1.FormDestroy(Sender: TObject);
 begin
  if IsPTTActive then
   OmniRig.Rig1.Tx := PM_RX;
-  
+
  StopKeyboardHook;
  Timer1.Enabled:=false;
 end;
 
+procedure TForm1.SavePos;
+begin
+  reg:=TRegistry.Create();
+  reg.RootKey := HKEY_CURRENT_USER;
+  reg.OpenKey(Ourkey, true);
+
+  reg.WriteInteger('Left', self.left);
+  reg.WriteInteger('Top', self.top);
+
+  FreeAndNil(reg);
+end;
+
+procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+ CanClose:=false;
+ SavePos;
+ WindowState:=wsMinimized;
+end;
+
+procedure TForm1.Exit1Click(Sender: TObject);
+begin
+ SavePos;
+ Close;
+end;
 
 end.
 

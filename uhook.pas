@@ -63,7 +63,6 @@ var
   p: PKBDLLHookStruct;
   processNormally:boolean;
 begin
-  processNormally := true;
   if nCode = HC_ACTION then
   begin
     p := PKBDLLHookStruct(lParam);
