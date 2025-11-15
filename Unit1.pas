@@ -20,7 +20,6 @@ uses
 type
   TForm1 = class(TForm)
     Timer1: TTimer;
-    Panel1: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -37,6 +36,7 @@ type
     procedure KillRigControl;
 
     procedure AdjustDown;
+    procedure DNRCheck;
   protected
     reg:TRegistry;
     procedure SavePos;
@@ -44,6 +44,7 @@ type
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
     PTTDown:boolean;
+    DNRCheckDeadline:Int64;
     DidIEnable:boolean;
   end;
 
@@ -87,6 +88,7 @@ begin
 
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
+  DoubleBuffered:=true;
 end;
 
 
@@ -129,7 +131,6 @@ begin
      PTTUnti:=xGetTickCount+AddHangTime;
    end;
   end else PTTUnti := 0;
-
 end;
 
 procedure TForm1.WmKeyboard(var Msg: TMessage);
@@ -188,10 +189,28 @@ begin
 
   //display the status string
   case RigNumber of
-    1: Panel1.Caption := OmniRig.Rig1.StatusStr;
+    1: Form1.Caption := OmniRig.Rig1.StatusStr;
     end;
 end;
 
+
+procedure TForm1.DNRCheck;
+var mode:RigStatusX;
+begin
+ if xGetTickCount> DNRCheckDeadline then
+ begin
+  DNRCheckDeadline:=xGetTickCount + 5000;
+
+  mode:=OmniRig.Rig1.Mode;
+
+   if (mode =  PM_DIG_U) or (mode = PM_DIG_L) then
+   begin
+     OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';');
+   end;
+
+ end;
+
+end;
 
 Function TForm1.IsPTTActive:boolean;
 begin
@@ -220,11 +239,12 @@ begin
 
   if (IsPTTActive) then
   begin
-    Panel1.Color:=clRed;
+    Form1.Color:=clRed;
   end else begin
-    Panel1.Color:=clBtnFace;
+    Form1.Color:=clBtnFace;
   end;
 
+  DNRCheck;
 
 end;
 
@@ -251,9 +271,9 @@ end;
 
 procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
- CanClose:=false;
  SavePos;
  WindowState:=wsMinimized;
+ CanClose:=true;
 end;
 
 procedure TForm1.Exit1Click(Sender: TObject);

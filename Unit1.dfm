@@ -1,7 +1,7 @@
 object Form1: TForm1
   Left = 269
   Top = 114
-  BorderIcons = [biSystemMenu]
+  BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsToolWindow
   Caption = 'OmniRig demo'
   ClientHeight = 62
@@ -20,16 +20,6 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
-  object Panel1: TPanel
-    Left = 0
-    Top = 0
-    Width = 122
-    Height = 62
-    Align = alClient
-    BevelInner = bvLowered
-    Caption = 'Panel1'
-    TabOrder = 0
-  end
   object Timer1: TTimer
     Enabled = False
     Interval = 55
