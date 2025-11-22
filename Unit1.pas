@@ -15,16 +15,18 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
-  Registry;
+  Registry, uconsole, udp;
 
 type
   TForm1 = class(TForm)
     Timer1: TTimer;
+    SlowTimer: TTimer;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure Exit1Click(Sender: TObject);
+    procedure SlowTimerTimer(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -32,13 +34,17 @@ type
 
     procedure WmKeyboard(var Msg: TMessage); message WM_HOOK_KEY;
     Function  IsPTTActive:boolean;
+    procedure SetPTT(enabled:boolean);
     procedure CreateRigControl;
     procedure KillRigControl;
 
     procedure AdjustDown;
     procedure DNRCheck;
   protected
+    prevStatusMsg:string;
     reg:TRegistry;
+    PMTxValidUntil:Int64;
+    PMTxOn:boolean;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -68,6 +74,7 @@ const
 procedure TForm1.FormCreate(Sender: TObject);
 var l,t:integer;
 begin
+// EnableCon;
   reg:=TRegistry.Create();
   try
    reg.RootKey := HKEY_CURRENT_USER;
@@ -80,11 +87,11 @@ begin
     self.Left:=l;
     self.top:=t;
    end;
-   
+
 
   except
    FreeAndNil(reg);
-  end; 
+  end;
 
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
@@ -149,10 +156,21 @@ end;
 //------------------------------------------------------------------------------
 //                         OmniRig event handling
 //------------------------------------------------------------------------------
+
+
 procedure TForm1.ParamsChangeEvent(Sender: TObject; RigNumber,
   Params: Integer);
+var statusMsg:string;
 begin
   if OmniRig = nil then Exit;
+
+  statusMsg:=OmniRig.Rig1.StatusStr;
+
+  if statusMsg<>prevStatusMsg
+   then begin
+     Con(statusMsg);
+     prevStatusMsg:=statusMsg;
+   end;
 
   case RigNumber of
     1:
@@ -160,12 +178,12 @@ begin
         then
           //display frequency and mode
           begin
-              Timer1.Enabled:=true;
+              if not Timer1.Enabled then Timer1.Enabled:=true;
           end
         else
           //if rig is not online, clear the fields
           begin
-              Timer1.Enabled:=false;
+              if Timer1.Enabled then Timer1.Enabled:=false;
           end;
     end;
   end;
@@ -175,7 +193,6 @@ begin
 procedure TForm1.RigTypeChangeEvent(Sender: TObject; RigNumber: Integer);
 begin
   if OmniRig = nil then Exit;
-
   //display the radio model
   case RigNumber of
     1: Caption := OmniRig.Rig1.RigType;
@@ -186,7 +203,6 @@ end;
 procedure TForm1.StatusChangeEvent(Sender: TObject; RigNumber: Integer);
 begin
   if OmniRig = nil then Exit;
-
   //display the status string
   case RigNumber of
     1: Form1.Caption := OmniRig.Rig1.StatusStr;
@@ -214,8 +230,27 @@ end;
 
 Function TForm1.IsPTTActive:boolean;
 begin
- result:=OmniRig.Rig1.Tx = PM_TX;
+ if xGetTickCount>PMTxValidUntil then
+ begin
+  result:=OmniRig.Rig1.Tx = PM_TX;
+  PMTxOn:=result;
+  PMTxValidUntil:=xGetTickCount+200;
+ end else result:=PMTxOn;
+
 end;
+
+procedure TForm1.SetPTT(enabled:boolean);
+begin
+ if enabled then
+   OmniRig.Rig1.Tx := PM_TX
+  else
+   OmniRig.Rig1.Tx := PM_RX;
+
+ PMTxOn:=enabled;
+ PMTxValidUntil:=xGetTickCount+200;
+end;
+
+
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 var needed:boolean;
@@ -228,11 +263,11 @@ begin
   begin
     if needed then
     begin
-         OmniRig.Rig1.Tx := PM_TX;
+         SetPTT(true);
          DidIEnable:=true;
     end
     else if DidIEnable then begin
-         OmniRig.Rig1.Tx := PM_RX;
+         SetPTT(false);
          DidIEnable:=false;
     end;
   end;
@@ -243,8 +278,6 @@ begin
   end else begin
     Form1.Color:=clBtnFace;
   end;
-
-  DNRCheck;
 
 end;
 
@@ -280,6 +313,24 @@ procedure TForm1.Exit1Click(Sender: TObject);
 begin
  SavePos;
  Close;
+end;
+
+procedure TForm1.SlowTimerTimer(Sender: TObject);
+var freq:Int64;
+begin
+ if OmniRig = nil then Exit;
+ SlowTimer.Enabled:=false;
+
+
+ if OmniRig.Rig1.Status = st_online then
+ begin
+  freq:=OmniRig.rig1.GetTxFrequency;
+  SendUDPInfo(freq div 10, '172.16.1.50', 12060);
+//  DNRCheck;
+ end;
+
+
+ SlowTimer.Enabled:=true;
 end;
 
 end.
