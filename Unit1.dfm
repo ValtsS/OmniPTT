@@ -28,7 +28,7 @@ object Form1: TForm1
     Top = 8
   end
   object SlowTimer: TTimer
-    Interval = 400
+    Interval = 200
     OnTimer = SlowTimerTimer
     Left = 64
     Top = 8
