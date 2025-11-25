@@ -45,6 +45,8 @@ type
     reg:TRegistry;
     PMTxValidUntil:Int64;
     PMTxOn:boolean;
+    PreviousFreq:Int64;
+    InhibitTXUntil:Int64;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -67,6 +69,8 @@ const
   VK_OEM_5 = $DC; // \ key
   AddHangTime = 200;
   Ourkey = '\Software\WNR\OmniPTT\';
+  SlowInt = 300;
+  FastInt = 200;
 
 //------------------------------------------------------------------------------
 //                  OmniRig object creation and destruction
@@ -241,6 +245,8 @@ end;
 
 procedure TForm1.SetPTT(enabled:boolean);
 begin
+ if (Enabled and (InhibitTXUntil<>0) and (InhibitTXUntil>xGetTickCount)) then exit;
+
  if enabled then
    OmniRig.Rig1.Tx := PM_TX
   else
@@ -264,7 +270,7 @@ begin
     if needed then
     begin
          SetPTT(true);
-         DidIEnable:=true;
+         DidIEnable:=IsPTTActive;
     end
     else if DidIEnable then begin
          SetPTT(false);
@@ -325,10 +331,17 @@ begin
  if OmniRig.Rig1.Status = st_online then
  begin
   freq:=OmniRig.rig1.GetTxFrequency;
+  if freq<>PreviousFreq then
+  begin
+   if SlowTimer.Interval<>FastInt then  SlowTimer.Interval:=FastInt;
+   InhibitTXUntil:=xGetTickCount+700;
+  end else
+   if SlowTimer.Interval<>SlowInt then SlowTimer.Interval:=SlowInt;
+
+  PreviousFreq:=freq;
   SendUDPInfo(freq div 10, '172.16.1.50', 12060);
 //  DNRCheck;
- end;
-
+ end else SlowTimer.Interval:=SlowInt;
 
  SlowTimer.Enabled:=true;
 end;
