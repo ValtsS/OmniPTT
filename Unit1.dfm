@@ -28,6 +28,15 @@ object Form1: TForm1
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 0
+    object HotCatcher1: THotCatcher
+      Left = 16
+      Top = 8
+      Width = 50
+      Height = 50
+      OnHotkey = HotCatcher1Hotkey
+      Color = clRed
+      Visible = True
+    end
   end
   object Panel2: TPanel
     Left = 72

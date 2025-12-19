@@ -15,7 +15,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
-  Registry, uconsole, udp, URElays;
+  Registry, uconsole, udp, URElays, uhotkey;
 
 type
   TForm1 = class(TForm)
@@ -23,6 +23,7 @@ type
     SlowTimer: TTimer;
     Panel1: TPanel;
     Panel2: TPanel;
+    HotCatcher1: THotCatcher;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -30,6 +31,8 @@ type
     procedure Exit1Click(Sender: TObject);
     procedure SlowTimerTimer(Sender: TObject);
     procedure Panel2Click(Sender: TObject);
+    procedure HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
+      VirtualKey: Integer);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -51,6 +54,7 @@ type
     PreviousFreq:Int64;
     InhibitTXUntil:Int64;
     RelayThread:trelays;
+    catcher:THotCatcher;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -110,6 +114,10 @@ begin
   panel1.  DoubleBuffered:=true;
   panel2.  DoubleBuffered:=true;
   DoubleBuffered:=true;
+
+  HotCatcher1.RegisterKey(1, MOD_CONTROL or MOD_SHIFT, VK_ADD);
+  HotCatcher1.RegisterKey(1, MOD_CONTROL or MOD_SHIFT, VK_SUBTRACT);
+
 end;
 
 
@@ -369,6 +377,13 @@ begin
   _on:=(RelayThread.RelayState and (1 shl CONST_RELAY_NR-1)) <> 0;
   RelayThread.RequestRelayState(CONST_RELAY_NR, not _on );
  end;
+end;
+
+
+procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
+  VirtualKey: Integer);
+begin
+  con('%x',[VirtualKey]);
 end;
 
 end.
