@@ -5,7 +5,9 @@ uses
   Unit1 in 'Unit1.pas' {Form1},
   OmniRig_TLB in 'OmniRig_TLB.pas',
   uhook in 'uhook.pas',
-  udp in 'udp.pas';
+  udp in 'udp.pas',
+  USBRelayDevice in 'USBRelayDevice.pas',
+  urelays in 'urelays.pas';
 
 {$R *.RES}
 

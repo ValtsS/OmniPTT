@@ -15,18 +15,21 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
-  Registry, uconsole, udp;
+  Registry, uconsole, udp, URElays;
 
 type
   TForm1 = class(TForm)
     Timer1: TTimer;
     SlowTimer: TTimer;
+    Panel1: TPanel;
+    Panel2: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure Exit1Click(Sender: TObject);
     procedure SlowTimerTimer(Sender: TObject);
+    procedure Panel2Click(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -47,6 +50,7 @@ type
     PMTxOn:boolean;
     PreviousFreq:Int64;
     InhibitTXUntil:Int64;
+    RelayThread:trelays;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -71,6 +75,9 @@ const
   Ourkey = '\Software\WNR\OmniPTT\';
   SlowInt = 300;
   FastInt = 200;
+
+  CONST_RELAY = 'S2OD2';
+  CONST_RELAY_NR = 1;
 
 //------------------------------------------------------------------------------
 //                  OmniRig object creation and destruction
@@ -99,6 +106,9 @@ begin
 
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
+  RelayThread:=TRelays.Create(CONST_RELAY, CONST_RELAY_NR);
+  panel1.  DoubleBuffered:=true;
+  panel2.  DoubleBuffered:=true;
   DoubleBuffered:=true;
 end;
 
@@ -280,10 +290,15 @@ begin
 
   if (IsPTTActive) then
   begin
-    Form1.Color:=clRed;
+    Panel1.Color:=clRed;
   end else begin
-    Form1.Color:=clBtnFace;
+    Panel1.Color:=clBtnFace;
   end;
+
+  if ((RelayThread.Status=0) and (RelayThread.RelayState>0)) then
+    Panel2.Color:=clLime
+  else
+    Panel2.Color:=clBtnFace;
 
 end;
 
@@ -344,6 +359,16 @@ begin
  end else SlowTimer.Interval:=SlowInt;
 
  SlowTimer.Enabled:=true;
+end;
+
+procedure TForm1.Panel2Click(Sender: TObject);
+var _on:boolean;
+begin
+ if RelayThread.status>=0 then
+ begin
+  _on:=(RelayThread.RelayState and (1 shl CONST_RELAY_NR-1)) <> 0;
+  RelayThread.RequestRelayState(CONST_RELAY_NR, not _on );
+ end;
 end;
 
 end.
