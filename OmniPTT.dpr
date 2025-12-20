@@ -7,7 +7,8 @@ uses
   uhook in 'uhook.pas',
   udp in 'udp.pas',
   USBRelayDevice in 'USBRelayDevice.pas',
-  urelays in 'urelays.pas';
+  urelays in 'urelays.pas',
+  VariantUtils in 'VariantUtils.pas';
 
 {$R *.RES}
 

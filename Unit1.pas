@@ -15,7 +15,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
-  Registry, uconsole, udp, URElays, uhotkey;
+  Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue;
 
 type
   TForm1 = class(TForm)
@@ -46,6 +46,7 @@ type
 
     procedure AdjustDown;
     procedure DNRCheck;
+    procedure CustomREply(Sender: TObject; RigNumber: Integer; Command: OleVariant; Reply: OleVariant);
   protected
     prevStatusMsg:string;
     reg:TRegistry;
@@ -55,6 +56,7 @@ type
     InhibitTXUntil:Int64;
     RelayThread:trelays;
     catcher:THotCatcher;
+    que_preamp:TQueue;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -108,6 +110,8 @@ begin
    FreeAndNil(reg);
   end;
 
+  que_preamp:=TQueue.Create;
+
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
   RelayThread:=TRelays.Create(CONST_RELAY, CONST_RELAY_NR);
@@ -115,8 +119,10 @@ begin
   panel2.  DoubleBuffered:=true;
   DoubleBuffered:=true;
 
-  HotCatcher1.RegisterKey(1, MOD_CONTROL or MOD_SHIFT, VK_ADD);
-  HotCatcher1.RegisterKey(1, MOD_CONTROL or MOD_SHIFT, VK_SUBTRACT);
+  HotCatcher1.RegisterKey(1, MOD_CONTROL, VK_ADD);
+  HotCatcher1.RegisterKey(2, MOD_CONTROL, VK_SUBTRACT);
+  HotCatcher1.RegisterKey(3, MOD_CONTROL, VK_MULTIPLY);
+  HotCatcher1.RegisterKey(4, MOD_CONTROL, VK_DIVIDE);
 
 end;
 
@@ -131,6 +137,7 @@ begin
     OmniRig.OnRigTypeChange := RigTypeChangeEvent;
     OmniRig.OnStatusChange := StatusChangeEvent;
     OmniRig.OnParamsChange := ParamsChangeEvent;
+    OmniRig.OnCustomReply := CustomREply;
 
     //Check OmniRig version: in this demo we want V.1.1 to 1.99
     if OmniRig.InterfaceVersion < $0101 then Abort;
@@ -317,6 +324,7 @@ begin
 
  StopKeyboardHook;
  Timer1.Enabled:=false;
+ FreeAndNil(que_preamp);
 end;
 
 procedure TForm1.SavePos;
@@ -383,7 +391,62 @@ end;
 procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
   VirtualKey: Integer);
 begin
-  con('%x',[VirtualKey]);
+  case UID of
+   1: begin
+       que_preamp.PushBack(1);
+       OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
+      end;
+   2: begin
+       que_preamp.PushBack(2);
+       OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
+      end;
+   3: begin
+       Panel2Click(nil);
+      end;
+   4: begin
+       OmniRig.Rig1.SendCustomCommand('NR0;', 5, ';');
+      end;
+  end;
+
+end;
+
+procedure TForm1.CustomREply(Sender: TObject; RigNumber: Integer; Command: OleVariant; Reply: OleVariant);
+var cmd, rep:string;
+    ecmd:cardinal;
+    r:integer;
+begin
+ cmd:=OleVariantToAnsiString(Command);
+ rep:=OleVariantToAnsiString(reply);
+
+   if cmd = 'PA0;' then begin // Preamp
+     if que_preamp.PopFront(ecmd) then begin
+       r:=strtoint(rep[4]);
+
+       case ecmd of
+        1:
+        begin
+         if r < 2 then begin
+          OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r+1)+';', 5, ';');
+         end;
+        end;
+
+        2:
+        begin
+         if r > 0 then begin
+           OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r-1)+';', 5, ';');
+         end;
+        end;
+       end;
+     end;
+
+   end else if cmd = 'NR0;' then begin // NR
+     if rep[4]='1'then
+      OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';')
+     else
+      OmniRig.Rig1.SendCustomCommand('NR01;', 5, ';');
+
+   end;
+
 end;
 
 end.

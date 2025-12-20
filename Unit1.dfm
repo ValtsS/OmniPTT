@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 269
-  Top = 114
+  Left = 359
+  Top = 137
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsToolWindow
   Caption = 'OmniRig demo'
@@ -31,11 +31,10 @@ object Form1: TForm1
     object HotCatcher1: THotCatcher
       Left = 16
       Top = 8
-      Width = 50
-      Height = 50
+      Width = 20
+      Height = 20
       OnHotkey = HotCatcher1Hotkey
       Color = clRed
-      Visible = True
     end
   end
   object Panel2: TPanel
