@@ -57,6 +57,7 @@ type
     RelayThread:trelays;
     catcher:THotCatcher;
     que_preamp:TQueue;
+    preamp_deadline:Int64;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -393,10 +394,12 @@ procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
 begin
   case UID of
    1: begin
+       preamp_deadline:=xGetTickCount+2000;
        que_preamp.PushBack(1);
        OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
       end;
    2: begin
+       preamp_deadline:=xGetTickCount+2000;
        que_preamp.PushBack(2);
        OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
       end;
@@ -418,9 +421,12 @@ begin
  cmd:=OleVariantToAnsiString(Command);
  rep:=OleVariantToAnsiString(reply);
 
+
    if cmd = 'PA0;' then begin // Preamp
      if que_preamp.PopFront(ecmd) then begin
+       if preamp_deadline>xGetTickCount then begin
        r:=strtoint(rep[4]);
+
 
        case ecmd of
         1:
@@ -437,13 +443,17 @@ begin
          end;
         end;
        end;
+       end;
      end;
 
+       Con('%x <-', [OmniRig.Rig1.Mode]);
+
+
    end else if cmd = 'NR0;' then begin // NR
-     if rep[4]='1'then
-      OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';')
-     else
-      OmniRig.Rig1.SendCustomCommand('NR01;', 5, ';');
+      if rep[4]='1'then
+       OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';')
+      else
+       OmniRig.Rig1.SendCustomCommand('NR01;', 5, ';');
 
    end;
 

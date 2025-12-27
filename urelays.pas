@@ -108,9 +108,6 @@ begin
 
   end else status:=-1;
 
-
- Con('%x %x',[status, relaystate]);
-
 end;
 
 Procedure TRelays.RequestRelayState(channel:integer; state:boolean);
