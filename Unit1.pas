@@ -57,7 +57,9 @@ type
     RelayThread:trelays;
     catcher:THotCatcher;
     que_preamp:TQueue;
+    que_dnr:TQueue;
     preamp_deadline:Int64;
+    dnr_deadline:Int64;
     procedure SavePos;
   public
     OmniRig: TOmniRigX;
@@ -112,6 +114,7 @@ begin
   end;
 
   que_preamp:=TQueue.Create;
+  que_dnr:=TQueue.Create;
 
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
@@ -251,7 +254,9 @@ begin
 
    if (mode =  PM_DIG_U) or (mode = PM_DIG_L) then
    begin
-     OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';');
+       dnr_deadline:=xGetTickCount+2000;
+       que_dnr.PushBack(3);
+       OmniRig.Rig1.SendCustomCommand('NR0;', 0, '');
    end;
 
  end;
@@ -326,6 +331,7 @@ begin
  StopKeyboardHook;
  Timer1.Enabled:=false;
  FreeAndNil(que_preamp);
+ FreeAndNil(que_dnr);
 end;
 
 procedure TForm1.SavePos;
@@ -372,7 +378,7 @@ begin
 
   PreviousFreq:=freq;
   SendUDPInfo(freq div 10, '172.16.1.50', 12060);
-//  DNRCheck;
+  DNRCheck;
  end else SlowTimer.Interval:=SlowInt;
 
  SlowTimer.Enabled:=true;
@@ -396,18 +402,20 @@ begin
    1: begin
        preamp_deadline:=xGetTickCount+2000;
        que_preamp.PushBack(1);
-       OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
+       OmniRig.Rig1.SendCustomCommand('PA0;', 0, '');
       end;
    2: begin
        preamp_deadline:=xGetTickCount+2000;
        que_preamp.PushBack(2);
-       OmniRig.Rig1.SendCustomCommand('PA0;', 5, ';');
+       OmniRig.Rig1.SendCustomCommand('PA0;', 0, '');
       end;
    3: begin
        Panel2Click(nil);
       end;
    4: begin
-       OmniRig.Rig1.SendCustomCommand('NR0;', 5, ';');
+       dnr_deadline:=xGetTickCount+2000;
+       que_dnr.PushBack(1);
+       OmniRig.Rig1.SendCustomCommand('NR0;', 0, '');
       end;
   end;
 
@@ -417,6 +425,7 @@ procedure TForm1.CustomREply(Sender: TObject; RigNumber: Integer; Command: OleVa
 var cmd, rep:string;
     ecmd:cardinal;
     r:integer;
+    dnr_on:boolean;
 begin
  cmd:=OleVariantToAnsiString(Command);
  rep:=OleVariantToAnsiString(reply);
@@ -432,14 +441,14 @@ begin
         1:
         begin
          if r < 2 then begin
-          OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r+1)+';', 5, ';');
+          OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r+1)+';', 0, '');
          end;
         end;
 
         2:
         begin
          if r > 0 then begin
-           OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r-1)+';', 5, ';');
+           OmniRig.Rig1.SendCustomCommand('PA0'+IntToStr(r-1)+';', 0, '');
          end;
         end;
        end;
@@ -450,10 +459,37 @@ begin
 
 
    end else if cmd = 'NR0;' then begin // NR
-      if rep[4]='1'then
-       OmniRig.Rig1.SendCustomCommand('NR00;', 5, ';')
-      else
-       OmniRig.Rig1.SendCustomCommand('NR01;', 5, ';');
+      dnr_on:=rep[4]='1';
+
+      if que_dnr.PopFront(ecmd) then
+      begin
+        if dnr_deadline > xGetTickCount then begin
+
+            case ecmd of
+             1:
+             begin
+                   if dnr_on then
+                          OmniRig.Rig1.SendCustomCommand('NR00;', 0, '')
+                   else
+                          OmniRig.Rig1.SendCustomCommand('NR01;', 0, '');
+
+             end;
+             2:
+             begin
+                   if not dnr_on then OmniRig.Rig1.SendCustomCommand('NR01;', 0, '');
+             end;
+             3:
+             begin
+                   if dnr_on then OmniRig.Rig1.SendCustomCommand('NR00;', 0, '');
+             end;
+
+
+            end;
+
+
+        end;
+      end;
+
 
    end;
 
