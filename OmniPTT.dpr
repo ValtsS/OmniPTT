@@ -8,7 +8,8 @@ uses
   udp in 'udp.pas',
   USBRelayDevice in 'USBRelayDevice.pas',
   urelays in 'urelays.pas',
-  VariantUtils in 'VariantUtils.pas';
+  VariantUtils in 'VariantUtils.pas',
+  IniReader in 'IniReader.pas';
 
 {$R *.RES}
 

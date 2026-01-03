@@ -14,8 +14,9 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook,
-  Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue;
+  OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook, jwaWinsock2,
+  Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue, udnslookup,
+  ustrlist, wsocks;
 
 type
   TForm1 = class(TForm)
@@ -24,6 +25,8 @@ type
     Panel1: TPanel;
     Panel2: TPanel;
     HotCatcher1: THotCatcher;
+    ErrTxt: TLabel;
+    Misc: TTimer;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -33,6 +36,7 @@ type
     procedure Panel2Click(Sender: TObject);
     procedure HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
       VirtualKey: Integer);
+    procedure MiscTimer(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -47,6 +51,7 @@ type
     procedure AdjustDown;
     procedure DNRCheck;
     procedure CustomREply(Sender: TObject; RigNumber: Integer; Command: OleVariant; Reply: OleVariant);
+    procedure LookupDone(hostent:PHostEnt; msgrec:TMessage); virtual;
   protected
     prevStatusMsg:string;
     reg:TRegistry;
@@ -60,7 +65,12 @@ type
     que_dnr:TQueue;
     preamp_deadline:Int64;
     dnr_deadline:Int64;
+    DNS:TDNSLookup;
+    rpi_hostip:string;
+    rpi_hostage:Int64;
     procedure SavePos;
+    procedure Lookup;
+
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -88,6 +98,8 @@ const
   CONST_RELAY = 'S2OD2';
   CONST_RELAY_NR = 1;
 
+  RPI = 'amp.wnrsoft.lv';
+
 //------------------------------------------------------------------------------
 //                  OmniRig object creation and destruction
 //------------------------------------------------------------------------------
@@ -95,6 +107,7 @@ procedure TForm1.FormCreate(Sender: TObject);
 var l,t:integer;
 begin
 // EnableCon;
+  DNS:=TDNSLookup.create;
   reg:=TRegistry.Create();
   try
    reg.RootKey := HKEY_CURRENT_USER;
@@ -113,6 +126,9 @@ begin
    FreeAndNil(reg);
   end;
 
+  self.Width:=120;
+  self.height:=60;
+
   que_preamp:=TQueue.Create;
   que_dnr:=TQueue.Create;
 
@@ -130,6 +146,13 @@ begin
 
 end;
 
+procedure TForm1.Lookup;
+begin
+  if xGetTickCount>rpi_hostage then begin
+   rpi_hostage:=xGetTickCount+15000;
+   DNS.QueueLookup(LookupDone, RPI);
+  end;
+end;
 
 procedure TForm1.CreateRigControl;
 begin
@@ -184,6 +207,27 @@ begin
   try FreeAndNil(OmniRig); except end;
 end;
 
+procedure TForm1.LookupDone(hostent:PHostEnt; msgrec:TMessage);
+var addres:istrlist;
+    err:integer;
+begin
+
+ err:=MsgRec.LParamHi;
+
+ if (err=0) then
+ begin
+  addres:=GetIPList(hostent);
+
+   if addres.count>0 then begin
+
+    rpi_hostip:=addres[0];
+    Con(rpi_hostip);
+   end else Con('Returned no IP addres...');
+
+ end else Con('DNS error %d',[err]);
+
+
+end;
 
 
 //------------------------------------------------------------------------------
@@ -332,6 +376,7 @@ begin
  Timer1.Enabled:=false;
  FreeAndNil(que_preamp);
  FreeAndNil(que_dnr);
+ if Assigned(DNS) then FreeAndNil(DNS);
 end;
 
 procedure TForm1.SavePos;
@@ -348,6 +393,7 @@ end;
 
 procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
+ if Assigned(DNS) then DNS.AbortAll;
  SavePos;
  WindowState:=wsMinimized;
  CanClose:=true;
@@ -360,6 +406,7 @@ begin
 end;
 
 procedure TForm1.SlowTimerTimer(Sender: TObject);
+const errMsg = 'No IP address for AMP!';
 var freq:Int64;
 begin
  if OmniRig = nil then Exit;
@@ -377,7 +424,13 @@ begin
    if SlowTimer.Interval<>SlowInt then SlowTimer.Interval:=SlowInt;
 
   PreviousFreq:=freq;
-  SendUDPInfo(freq div 10, '172.16.1.50', 12060);
+  if rpi_hostip<>'' then begin
+   SendUDPInfo(freq div 10, rpi_hostip, 12060);
+   if ErrTxt.Caption = errMsg then
+    ErrTxt.Caption:='';
+  end  else begin
+   ErrTxt.Caption:=errMsg;
+  end;
   DNRCheck;
  end else SlowTimer.Interval:=SlowInt;
 
@@ -430,9 +483,12 @@ begin
  cmd:=OleVariantToAnsiString(Command);
  rep:=OleVariantToAnsiString(reply);
 
+ Con('%s %s', [cmd, rep]);
+
+
 
    if cmd = 'PA0;' then begin // Preamp
-     if que_preamp.PopFront(ecmd) then begin
+     while que_preamp.PopFront(ecmd) do begin
        if preamp_deadline>xGetTickCount then begin
        r:=strtoint(rep[4]);
 
@@ -455,13 +511,11 @@ begin
        end;
      end;
 
-       Con('%x <-', [OmniRig.Rig1.Mode]);
-
 
    end else if cmd = 'NR0;' then begin // NR
       dnr_on:=rep[4]='1';
 
-      if que_dnr.PopFront(ecmd) then
+      while que_dnr.PopFront(ecmd) do
       begin
         if dnr_deadline > xGetTickCount then begin
 
@@ -493,6 +547,11 @@ begin
 
    end;
 
+end;
+
+procedure TForm1.MiscTimer(Sender: TObject);
+begin
+ Lookup;
 end;
 
 end.
