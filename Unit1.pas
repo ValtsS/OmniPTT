@@ -143,6 +143,16 @@ begin
   HotCatcher1.RegisterKey(2, MOD_CONTROL, VK_SUBTRACT);
   HotCatcher1.RegisterKey(3, MOD_CONTROL, VK_MULTIPLY);
   HotCatcher1.RegisterKey(4, MOD_CONTROL, VK_DIVIDE);
+  HotCatcher1.RegisterKey(5, 0, VK_DIVIDE);
+  HotCatcher1.RegisterKey(6, 0, VK_NUMPAD0);
+
+  HotCatcher1.RegisterKey(10, 0, VK_NUMPAD6);
+  HotCatcher1.RegisterKey(11, 0, VK_NUMPAD4);
+  HotCatcher1.RegisterKey(12, MOD_CONTROL, VK_NUMPAD6);
+  HotCatcher1.RegisterKey(13, MOD_CONTROL, VK_NUMPAD4);
+
+  HotCatcher1.RegisterKey(14, 0, VK_NUMPAD5);
+  HotCatcher1.RegisterKey(15, MOD_CONTROL, VK_DECIMAL);
 
 end;
 
@@ -296,7 +306,7 @@ begin
 
   mode:=OmniRig.Rig1.Mode;
 
-   if (mode =  PM_DIG_U) or (mode = PM_DIG_L) then
+   if (mode =  PM_DIG_U) {or (mode = PM_DIG_L)} then
    begin
        dnr_deadline:=xGetTickCount+2000;
        que_dnr.PushBack(3);
@@ -470,6 +480,98 @@ begin
        que_dnr.PushBack(1);
        OmniRig.Rig1.SendCustomCommand('NR0;', 0, '');
       end;
+   5: begin
+       OmniRig.Rig1.SendCustomCommand('SV;', 0, '');
+      end;
+   6: begin
+       OmniRig.Rig1.SendCustomCommand('BC0;', 0, '');
+      end;
+
+   10: begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOAB:
+                       begin
+                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA+5000;
+                       end;
+              PM_VFOB,
+              PM_VFOBA, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB+5000;
+                       end;
+             end;
+       end;
+
+   11: begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOAB:
+                       begin
+                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA-5000;
+                       end;
+              PM_VFOB,
+              PM_VFOBA, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB-5000;
+                       end;
+             end;
+             end;
+
+
+   12: begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOBA:
+                       begin
+                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA+5000;
+                       end;
+              PM_VFOB,
+              PM_VFOAB, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB+5000;
+                       end;
+             end;
+       end;
+
+   13: begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOBA:
+                       begin
+                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA-5000;
+                       end;
+              PM_VFOB,
+              PM_VFOAB, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB-5000;
+                       end;
+             end;
+       end;
+
+
+   14: begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOAB:
+                       begin
+                            OmniRig.Rig1.freqA:= round(OmniRig.Rig1.freqA/1000.0)*1000;
+                       end;
+              PM_VFOB,
+              PM_VFOBA, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= round(OmniRig.Rig1.freqB/1000.0)*1000;
+                       end;
+             end;
+
+       end;
+    15: begin
+             if Omnirig.Rig1.Split = PM_SPLITON
+              then Omnirig.Rig1.Split := PM_SPLITOFF
+             else
+              Omnirig.Rig1.SetSplitMode(OmniRig.Rig1.GetRxFrequency, OmniRig.Rig1.GetRxFrequency+5000);
+
+        end;
+
   end;
 
 end;
@@ -535,6 +637,7 @@ begin
              3:
              begin
                    if dnr_on then OmniRig.Rig1.SendCustomCommand('NR00;', 0, '');
+                   OmniRig.Rig1.SendCustomCommand('BC00;', 0, '');
              end;
 
 
@@ -544,6 +647,13 @@ begin
         end;
       end;
 
+
+   end else if cmd = 'BC0;' then begin // DNF
+      dnr_on:=rep[4]='1';
+      if dnr_on then
+         OmniRig.Rig1.SendCustomCommand('BC00;', 0, '')
+      else
+         OmniRig.Rig1.SendCustomCommand('BC01;', 0, '');
 
    end;
 
