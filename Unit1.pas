@@ -16,7 +16,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook, jwaWinsock2,
   Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue, udnslookup,
-  ustrlist, wsocks;
+  ustrlist, wsocks, Math;
 
 type
   TForm1 = class(TForm)
@@ -37,6 +37,7 @@ type
     procedure HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
       VirtualKey: Integer);
     procedure MiscTimer(Sender: TObject);
+    procedure Panel1Click(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -68,6 +69,14 @@ type
     DNS:TDNSLookup;
     rpi_hostip:string;
     rpi_hostage:Int64;
+
+    deadline_level:Int64;
+    deadline_span:Int64;
+    deadline_mode:Int64;
+
+    current_level:double;
+    current_span:integer;
+    current_mode:integer;
     procedure SavePos;
     procedure Lookup;
 
@@ -100,9 +109,9 @@ const
 
   RPI = 'amp.wnrsoft.lv';
 
-//------------------------------------------------------------------------------
-//                  OmniRig object creation and destruction
-//------------------------------------------------------------------------------
+
+
+
 procedure TForm1.FormCreate(Sender: TObject);
 var l,t:integer;
 begin
@@ -154,7 +163,29 @@ begin
   HotCatcher1.RegisterKey(14, 0, VK_NUMPAD5);
   HotCatcher1.RegisterKey(15, MOD_CONTROL, VK_DECIMAL);
 
+
+  HotCatcher1.RegisterKey(20, 0, VK_NUMPAD1);
+  HotCatcher1.RegisterKey(21, 0, VK_NUMPAD2);
+  HotCatcher1.RegisterKey(22, 0, VK_NUMPAD3);
+
+  t:=VK_F1;
+  for l:=30 to 40 do begin
+   HotCatcher1.RegisterKey(l, MOD_SHIFT or MOD_CONTROL, t);
+   inc(t);
+  end;
+
+  HotCatcher1.RegisterKey(50, MOD_CONTROL, VK_NUMPAD8);
+  HotCatcher1.RegisterKey(51, MOD_CONTROL, VK_NUMPAD2);
+
+  HotCatcher1.RegisterKey(52, 0, VK_NUMPAD7);
+  HotCatcher1.RegisterKey(53, 0, VK_NUMPAD9);
+
+  HotCatcher1.RegisterKey(54, 0, VK_NUMPAD8);
+
+
 end;
+
+
 
 procedure TForm1.Lookup;
 begin
@@ -314,6 +345,18 @@ begin
    end;
 
  end;
+
+ if xGetTickCount > deadline_level then begin
+   OmniRig.Rig1.SendCustomCommand('SS04;', 0, '');
+   deadline_level:=xGetTickCount+10000;
+ end else if xGetTickCount > deadline_span  then begin
+ OmniRig.Rig1.SendCustomCommand('SS05;', 0, '');
+   deadline_span:=xGetTickCount+9000;
+ end else if xGetTickCount > deadline_mode then begin
+ OmniRig.Rig1.SendCustomCommand('SS06;', 0, '');
+   deadline_mode:=xGetTickCount+8000;
+ end;
+
 
 end;
 
@@ -567,11 +610,62 @@ begin
     15: begin
              if Omnirig.Rig1.Split = PM_SPLITON
               then Omnirig.Rig1.Split := PM_SPLITOFF
-             else
+             else begin
               Omnirig.Rig1.SetSplitMode(OmniRig.Rig1.GetRxFrequency, OmniRig.Rig1.GetRxFrequency+5000);
+              OmniRig.Rig1.SendCustomCommand('SS0670000;',0,'');
+              OmniRig.Rig1.SendCustomCommand('SS0570000;',0,'');              
+             end;
 
         end;
 
+     20: begin
+           OmniRig.Rig1.SendCustomCommand('MD01;',0,'');
+           OmniRig.Rig1.SendCustomCommand('MD11;',0,'');
+         end;
+     21: begin
+           OmniRig.Rig1.SendCustomCommand('MD02;',0,'');
+           OmniRig.Rig1.SendCustomCommand('MD12;',0,'');
+         end;
+     22: begin
+           OmniRig.Rig1.SendCustomCommand('MD0C;',0,'');
+           OmniRig.Rig1.SendCustomCommand('MD1C;',0,'');
+         end;
+
+     30..40: begin
+           OmniRig.Rig1.SendCustomCommand('BS'+Format('%.2d;',[UID-30]),0,'');
+        end;
+
+      50..51: begin
+          if UID=50 then
+            current_level:=Min(12,current_level+3)
+           else
+            current_level:=Max(-12,current_level-3);
+
+           OmniRig.Rig1.SendCustomCommand('SS04'+FormatFloat('+00.0;-00.0;+00.0', current_level)+';',0,'');
+          end;
+      52..53: begin
+             if current_span>=0 then begin
+
+               if UID=52 then
+                 current_span:=Max(0,current_span-1)
+               else
+                 current_span:=Min(9,current_span+1);
+
+              OmniRig.Rig1.SendCustomCommand('SS05'+inttostr(current_span)+'0000;',0,'');
+
+             end;
+          end;
+      54: begin
+            if current_mode>=0 then begin
+
+               if current_mode=7 then
+                current_mode := 10 else
+                current_mode := 7;
+
+               OmniRig.Rig1.SendCustomCommand('SS06'+inttohex(current_mode,1)+'0000;',0,'');
+
+            end;
+          end;    
   end;
 
 end;
@@ -581,14 +675,25 @@ var cmd, rep:string;
     ecmd:cardinal;
     r:integer;
     dnr_on:boolean;
+    tmp:string;
 begin
  cmd:=OleVariantToAnsiString(Command);
  rep:=OleVariantToAnsiString(reply);
 
  Con('%s %s', [cmd, rep]);
 
-
-
+   if cmd = 'SS04;' then begin // level
+    tmp:=Copy(rep, 5, 5);
+    current_level:=StrToFloat(tmp);
+   end else
+   if cmd = 'SS05;' then begin  // span
+    tmp:=Copy(rep, 5, 1);
+    current_span:=StrToIntDef(tmp, -1);
+   end else
+   if cmd = 'SS06;' then begin // mode
+    tmp:=Copy(rep, 5, 1);
+    current_mode:=StrToIntDef('$'+tmp, -1);
+   end else
    if cmd = 'PA0;' then begin // Preamp
      while que_preamp.PopFront(ecmd) do begin
        if preamp_deadline>xGetTickCount then begin
@@ -662,6 +767,13 @@ end;
 procedure TForm1.MiscTimer(Sender: TObject);
 begin
  Lookup;
+end;
+
+procedure TForm1.Panel1Click(Sender: TObject);
+var val:string;
+begin
+  if InputQuery('Comamnd to send to rig', '',val) then
+            OmniRig.Rig1.SendCustomCommand(val, 0, '');
 end;
 
 end.

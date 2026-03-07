@@ -28,6 +28,7 @@ object Form1: TForm1
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 0
+    OnClick = Panel1Click
     object ErrTxt: TLabel
       Left = 0
       Top = 0
