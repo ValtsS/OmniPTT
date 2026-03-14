@@ -9,7 +9,8 @@ uses
   USBRelayDevice in 'USBRelayDevice.pas',
   urelays in 'urelays.pas',
   VariantUtils in 'VariantUtils.pas',
-  IniReader in 'IniReader.pas';
+  IniReader in 'IniReader.pas',
+  finputfreq in 'finputfreq.pas' {FreqInputForm};
 
 {$R *.RES}
 

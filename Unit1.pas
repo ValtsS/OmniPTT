@@ -16,7 +16,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook, jwaWinsock2,
   Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue, udnslookup,
-  ustrlist, wsocks, Math;
+  ustrlist, wsocks, Math, finputfreq;
 
 type
   TForm1 = class(TForm)
@@ -76,10 +76,15 @@ type
 
     current_level:double;
     current_span:integer;
-    current_mode:integer;
+    current_mode, prev_mode:integer;
+    prev_volume:string;
+    freqInput:TFreqInputForm;
+
     procedure SavePos;
     procedure Lookup;
 
+    procedure TuneFreq(Delta:Int64);
+    procedure NewFreqRequested(freq:Integer);
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -98,6 +103,7 @@ implementation
 
 const
   HOTKEY_ID = 1;
+  VK_OEM_3 = $C0;
   VK_OEM_5 = $DC; // \ key
   AddHangTime = 200;
   Ourkey = '\Software\WNR\OmniPTT\';
@@ -140,7 +146,7 @@ begin
 
   que_preamp:=TQueue.Create;
   que_dnr:=TQueue.Create;
-
+  prev_volume:='010';
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
   RelayThread:=TRelays.Create(CONST_RELAY, CONST_RELAY_NR);
@@ -148,41 +154,56 @@ begin
   panel2.  DoubleBuffered:=true;
   DoubleBuffered:=true;
 
-  HotCatcher1.RegisterKey(1, MOD_CONTROL, VK_ADD);
-  HotCatcher1.RegisterKey(2, MOD_CONTROL, VK_SUBTRACT);
-  HotCatcher1.RegisterKey(3, MOD_CONTROL, VK_MULTIPLY);
-  HotCatcher1.RegisterKey(4, MOD_CONTROL, VK_DIVIDE);
-  HotCatcher1.RegisterKey(5, 0, VK_DIVIDE);
-  HotCatcher1.RegisterKey(6, 0, VK_NUMPAD0);
+  HotCatcher1.RegisterKey(1, MOD_CONTROL, VK_ADD); // Preamp increase
+  HotCatcher1.RegisterKey(2, MOD_CONTROL, VK_SUBTRACT); // Preamp decrease
+  HotCatcher1.RegisterKey(3, MOD_CONTROL, VK_MULTIPLY); // Toggle panorama
+  HotCatcher1.RegisterKey(4, MOD_CONTROL, VK_DIVIDE);  // Toggle DNR
+  HotCatcher1.RegisterKey(5, 0, VK_DIVIDE);   // Swap VFO A/B
+  HotCatcher1.RegisterKey(6, MOD_CONTROL, VK_NUMPAD0); // Toggle DNF
+  HotCatcher1.RegisterKey(7, 0, VK_OEM_3);   // Swap VFO A/B
 
-  HotCatcher1.RegisterKey(10, 0, VK_NUMPAD6);
-  HotCatcher1.RegisterKey(11, 0, VK_NUMPAD4);
-  HotCatcher1.RegisterKey(12, MOD_CONTROL, VK_NUMPAD6);
-  HotCatcher1.RegisterKey(13, MOD_CONTROL, VK_NUMPAD4);
+  HotCatcher1.RegisterKey(10, 0, VK_NUMPAD6); // Active VFO +5KHz
+  HotCatcher1.RegisterKey(11, 0, VK_NUMPAD4); // Active VFO -5kHz
 
-  HotCatcher1.RegisterKey(14, 0, VK_NUMPAD5);
-  HotCatcher1.RegisterKey(15, MOD_CONTROL, VK_DECIMAL);
+  HotCatcher1.RegisterKey(8, MOD_ALT, VK_NUMPAD6); // Active VFO +5KHz
+  HotCatcher1.RegisterKey(9, MOD_ALT, VK_NUMPAD4); // Active VFO -5kHz
+
+  HotCatcher1.RegisterKey(12, MOD_CONTROL, VK_NUMPAD6); // Secondary VFO +5kHz
+  HotCatcher1.RegisterKey(13, MOD_CONTROL, VK_NUMPAD4); // Secondary VFO -5kHz
+
+  HotCatcher1.RegisterKey(14, 0, VK_NUMPAD5); // Round active VFO freqy
+  HotCatcher1.RegisterKey(15, MOD_CONTROL, VK_DECIMAL); // Toggle split mode
 
 
-  HotCatcher1.RegisterKey(20, 0, VK_NUMPAD1);
-  HotCatcher1.RegisterKey(21, 0, VK_NUMPAD2);
-  HotCatcher1.RegisterKey(22, 0, VK_NUMPAD3);
+  HotCatcher1.RegisterKey(20, 0, VK_NUMPAD1); // SSB
+  HotCatcher1.RegisterKey(22, 0, VK_NUMPAD3); // DATA
 
   t:=VK_F1;
   for l:=30 to 40 do begin
-   HotCatcher1.RegisterKey(l, MOD_SHIFT or MOD_CONTROL, t);
+   HotCatcher1.RegisterKey(l, MOD_SHIFT or MOD_CONTROL, t); // bands 160 to 6m
    inc(t);
   end;
 
-  HotCatcher1.RegisterKey(50, MOD_CONTROL, VK_NUMPAD8);
-  HotCatcher1.RegisterKey(51, MOD_CONTROL, VK_NUMPAD2);
+  HotCatcher1.RegisterKey(50, MOD_CONTROL, VK_NUMPAD8); // waterfall gain up +3dB
+  HotCatcher1.RegisterKey(51, MOD_CONTROL, VK_NUMPAD2); // waterfall gain down -3dB
 
-  HotCatcher1.RegisterKey(52, 0, VK_NUMPAD7);
-  HotCatcher1.RegisterKey(53, 0, VK_NUMPAD9);
+  HotCatcher1.RegisterKey(52, 0, VK_NUMPAD8); // zoom in
+  HotCatcher1.RegisterKey(53, 0, VK_NUMPAD2); // zoom out
 
-  HotCatcher1.RegisterKey(54, 0, VK_NUMPAD8);
+  HotCatcher1.RegisterKey(60, 0, VK_NUMPAD7); // move view left
+  HotCatcher1.RegisterKey(61, 0, VK_NUMPAD9); // move view right
 
 
+  HotCatcher1.RegisterKey(54, 0, VK_MULTIPLY); // toggle scope
+
+
+  HotCatcher1.RegisterKey(70, MOD_SHIFT or MOD_CONTROL, ord('M')); // mute/unmute
+
+
+  HotCatcher1.RegisterKey(80,  MOD_SHIFT or MOD_CONTROL, VK_F12); // manual freq
+
+  freqInput:=TFreqInputForm.Create(self);
+  freqInput.OnFreqChange:=NewFreqRequested;
 end;
 
 
@@ -501,8 +522,26 @@ begin
 end;
 
 
+Function SpanToHz(span:integer):integer;
+begin
+  result:=0;
+  case span of
+   0: result:=1000;
+   1: result:=2*1000;
+   2: result:=5*1000;
+   3: result:=10*1000;
+   4: result:=20*1000;
+   5: result:=50*1000;
+   6: result:=100*1000;
+   7: result:=200*1000;
+   8: result:=500*1000;
+   9: result:=1000*1000;
+  end;
+end;
+
 procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
   VirtualKey: Integer);
+var tmp, tmp2, f1, f2:integer;
 begin
   case UID of
    1: begin
@@ -523,44 +562,22 @@ begin
        que_dnr.PushBack(1);
        OmniRig.Rig1.SendCustomCommand('NR0;', 0, '');
       end;
-   5: begin
+   5,7: begin
        OmniRig.Rig1.SendCustomCommand('SV;', 0, '');
       end;
    6: begin
        OmniRig.Rig1.SendCustomCommand('BC0;', 0, '');
       end;
 
-   10: begin
-            case OmniRig.Rig1.Vfo of
-              PM_VFOA,
-              PM_VFOAA, PM_VFOAB:
-                       begin
-                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA+5000;
-                       end;
-              PM_VFOB,
-              PM_VFOBA, PM_VFOBB:
-                       begin
-                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB+5000;
-                       end;
-             end;
+   8,10: begin
+           if uid=10 then tmp:=5000 else tmp:=500;
+           TuneFreq(tmp);
        end;
 
-   11: begin
-            case OmniRig.Rig1.Vfo of
-              PM_VFOA,
-              PM_VFOAA, PM_VFOAB:
-                       begin
-                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA-5000;
-                       end;
-              PM_VFOB,
-              PM_VFOBA, PM_VFOBB:
-                       begin
-                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB-5000;
-                       end;
-             end;
-             end;
-
-
+   9,11: begin
+           if uid=11 then tmp:=5000 else tmp:=500;
+           TuneFreq(-tmp);
+          end;
    12: begin
             case OmniRig.Rig1.Vfo of
               PM_VFOA,
@@ -606,6 +623,13 @@ begin
                        end;
              end;
 
+
+             if current_mode>=0 then begin
+              OmniRig.Rig1.SendCustomCommand('SS06'+inttohex(current_mode,1)+'0000;',0,'');
+              deadline_span:=0;
+             end 
+
+
        end;
     15: begin
              if Omnirig.Rig1.Split = PM_SPLITON
@@ -613,19 +637,20 @@ begin
              else begin
               Omnirig.Rig1.SetSplitMode(OmniRig.Rig1.GetRxFrequency, OmniRig.Rig1.GetRxFrequency+5000);
               OmniRig.Rig1.SendCustomCommand('SS0670000;',0,'');
-              OmniRig.Rig1.SendCustomCommand('SS0570000;',0,'');              
+              OmniRig.Rig1.SendCustomCommand('SS0570000;',0,'');
              end;
 
         end;
 
      20: begin
-           OmniRig.Rig1.SendCustomCommand('MD01;',0,'');
-           OmniRig.Rig1.SendCustomCommand('MD11;',0,'');
-         end;
-     21: begin
-           OmniRig.Rig1.SendCustomCommand('MD02;',0,'');
-           OmniRig.Rig1.SendCustomCommand('MD12;',0,'');
-         end;
+           if OmniRig.Rig1.GetRxFrequency<10e6 then begin
+             OmniRig.Rig1.SendCustomCommand('MD01;',0,'');
+             OmniRig.Rig1.SendCustomCommand('MD11;',0,'');
+           end else begin
+            OmniRig.Rig1.SendCustomCommand('MD02;',0,'');
+            OmniRig.Rig1.SendCustomCommand('MD12;',0,'');
+           end;
+          end;
      22: begin
            OmniRig.Rig1.SendCustomCommand('MD0C;',0,'');
            OmniRig.Rig1.SendCustomCommand('MD1C;',0,'');
@@ -652,21 +677,83 @@ begin
                  current_span:=Min(9,current_span+1);
 
               OmniRig.Rig1.SendCustomCommand('SS05'+inttostr(current_span)+'0000;',0,'');
+              OmniRig.Rig1.SendCustomCommand('SS06'+inttohex(current_mode,1)+'0000;',0,'');
 
              end;
           end;
       54: begin
             if current_mode>=0 then begin
 
-               if current_mode=7 then
-                current_mode := 10 else
-                current_mode := 7;
+               if (current_mode >=6) and (current_mode<=8) then
+               begin
+                prev_mode:=current_mode;
+                current_mode := 10;
+               end else
+                begin
+                 if (prev_mode >=6) and (prev_mode<=8) then
+                  current_mode:=prev_mode
+                  else current_mode:=7;
+
+                end;
 
                OmniRig.Rig1.SendCustomCommand('SS06'+inttohex(current_mode,1)+'0000;',0,'');
+               deadline_span:=0;
 
             end;
-          end;    
+          end;
+       70:
+        begin
+           OmniRig.Rig1.SendCustomCommand('AG0;',0,'');
+
+        end;
+       80:
+        begin
+          if freqInput.Visible then
+           freqInput.Close
+          else begin
+           Application.BringToFront;
+           freqInput.Visible:=true;
+           freqInput.BringToFront;
+           freqInput.EditFreq.SetFocus;
+          end;
+
+        end;
   end;
+
+end;
+
+procedure TForm1.NewFreqRequested(freq:Integer);
+begin
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOAB:
+                       begin
+                            OmniRig.Rig1.freqA:= freq;
+                       end;
+              PM_VFOB,
+              PM_VFOBA, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= freq;
+                       end;
+             end;
+
+end;
+
+procedure TForm1.TuneFreq(Delta:Int64);
+begin
+
+            case OmniRig.Rig1.Vfo of
+              PM_VFOA,
+              PM_VFOAA, PM_VFOAB:
+                       begin
+                            OmniRig.Rig1.freqA:= OmniRig.Rig1.freqA+Delta;
+                       end;
+              PM_VFOB,
+              PM_VFOBA, PM_VFOBB:
+                       begin
+                            OmniRig.Rig1.freqB:= OmniRig.Rig1.freqB+Delta;
+                       end;
+             end;
 
 end;
 
@@ -759,6 +846,16 @@ begin
          OmniRig.Rig1.SendCustomCommand('BC00;', 0, '')
       else
          OmniRig.Rig1.SendCustomCommand('BC01;', 0, '');
+
+   end else if cmd = 'AG0;' then begin // Mute/unmute
+     tmp:=Copy(rep, 4, 3);
+     if (tmp = '000') then
+       OmniRig.Rig1.SendCustomCommand('AG0'+prev_volume+';', 0, '')
+     else begin
+       prev_volume:=tmp;
+       if (prev_volume='000') then prev_volume := '005';
+       OmniRig.Rig1.SendCustomCommand('AG0000;', 0, '');
+     end;
 
    end;
 
