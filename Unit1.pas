@@ -15,8 +15,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook, jwaWinsock2,
-  Registry, uconsole, udp, URElays, uhotkey, variantutils, uqueue, udnslookup,
-  ustrlist, wsocks, Math, finputfreq;
+  Registry, uconsole, udp, uhotkey, variantutils, uqueue, udnslookup,
+  ustrlist, wsocks, Math, finputfreq, frb;
 
 type
   TForm1 = class(TForm)
@@ -60,7 +60,6 @@ type
     PMTxOn:boolean;
     PreviousFreq:Int64;
     InhibitTXUntil:Int64;
-    RelayThread:trelays;
     catcher:THotCatcher;
     que_preamp:TQueue;
     que_dnr:TQueue;
@@ -73,12 +72,14 @@ type
     deadline_level:Int64;
     deadline_span:Int64;
     deadline_mode:Int64;
+    deadline_slit:Int64;
 
     current_level:double;
     current_span:integer;
     current_mode, prev_mode:integer;
     prev_volume:string;
     freqInput:TFreqInputForm;
+    relays2:TRelays2;
 
     procedure SavePos;
     procedure Lookup;
@@ -115,7 +116,7 @@ const
 
   RPI = 'amp.wnrsoft.lv';
 
-
+  CONST_COM = 7;
 
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -144,12 +145,13 @@ begin
   self.Width:=120;
   self.height:=60;
 
+  relays2:=TRelays2.Create(CONST_COM);
+
   que_preamp:=TQueue.Create;
   que_dnr:=TQueue.Create;
   prev_volume:='010';
   CreateRigControl;
   StartKeyboardHook(WindowHandle);
-  RelayThread:=TRelays.Create(CONST_RELAY, CONST_RELAY_NR);
   panel1.  DoubleBuffered:=true;
   panel2.  DoubleBuffered:=true;
   DoubleBuffered:=true;
@@ -367,6 +369,16 @@ begin
 
  end;
 
+ if xGetTickCount > deadline_slit then begin
+   if Omnirig.Rig1.Split = PM_SPLITON then begin
+     if Abs(Omnirig.Rig1.FreqA-Omnirig.Rig1.FreqB)>200*1000 then begin
+      Omnirig.Rig1.Split := PM_SPLIToFF;
+     end;
+   end;
+
+   deadline_slit:=xGetTickCount+2700;
+ end;
+
  if xGetTickCount > deadline_level then begin
    OmniRig.Rig1.SendCustomCommand('SS04;', 0, '');
    deadline_level:=xGetTickCount+10000;
@@ -434,7 +446,7 @@ begin
     Panel1.Color:=clBtnFace;
   end;
 
-  if ((RelayThread.Status=0) and (RelayThread.RelayState>0)) then
+  if ((relays2.Status>0)) then
     Panel2.Color:=clLime
   else
     Panel2.Color:=clBtnFace;
@@ -514,11 +526,11 @@ end;
 procedure TForm1.Panel2Click(Sender: TObject);
 var _on:boolean;
 begin
- if RelayThread.status>=0 then
- begin
-  _on:=(RelayThread.RelayState and (1 shl CONST_RELAY_NR-1)) <> 0;
-  RelayThread.RequestRelayState(CONST_RELAY_NR, not _on );
- end;
+
+  if relays2.Status=0 then
+    relays2.Request(1)
+  else
+   relays2.Request(0);
 end;
 
 
@@ -541,6 +553,18 @@ end;
 
 procedure TForm1.HotCatcher1Hotkey(Sender: TObject; UID, Modifier,
   VirtualKey: Integer);
+
+ procedure SetSSB;
+ begin
+           if OmniRig.Rig1.GetRxFrequency<10e6 then begin
+             OmniRig.Rig1.SendCustomCommand('MD01;',0,'');
+             OmniRig.Rig1.SendCustomCommand('MD11;',0,'');
+           end else begin
+            OmniRig.Rig1.SendCustomCommand('MD02;',0,'');
+            OmniRig.Rig1.SendCustomCommand('MD12;',0,'');
+           end;
+ end;
+
 var tmp, tmp2, f1, f2:integer;
 begin
   case UID of
@@ -627,7 +651,7 @@ begin
              if current_mode>=0 then begin
               OmniRig.Rig1.SendCustomCommand('SS06'+inttohex(current_mode,1)+'0000;',0,'');
               deadline_span:=0;
-             end 
+             end
 
 
        end;
@@ -636,6 +660,7 @@ begin
               then Omnirig.Rig1.Split := PM_SPLITOFF
              else begin
               Omnirig.Rig1.SetSplitMode(OmniRig.Rig1.GetRxFrequency, OmniRig.Rig1.GetRxFrequency+5000);
+              SetSSB;
               OmniRig.Rig1.SendCustomCommand('SS0670000;',0,'');
               OmniRig.Rig1.SendCustomCommand('SS0570000;',0,'');
              end;
@@ -643,13 +668,7 @@ begin
         end;
 
      20: begin
-           if OmniRig.Rig1.GetRxFrequency<10e6 then begin
-             OmniRig.Rig1.SendCustomCommand('MD01;',0,'');
-             OmniRig.Rig1.SendCustomCommand('MD11;',0,'');
-           end else begin
-            OmniRig.Rig1.SendCustomCommand('MD02;',0,'');
-            OmniRig.Rig1.SendCustomCommand('MD12;',0,'');
-           end;
+           SetSSB;
           end;
      22: begin
            OmniRig.Rig1.SendCustomCommand('MD0C;',0,'');

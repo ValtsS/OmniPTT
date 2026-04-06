@@ -6,11 +6,10 @@ uses
   OmniRig_TLB in 'OmniRig_TLB.pas',
   uhook in 'uhook.pas',
   udp in 'udp.pas',
-  USBRelayDevice in 'USBRelayDevice.pas',
-  urelays in 'urelays.pas',
   VariantUtils in 'VariantUtils.pas',
   IniReader in 'IniReader.pas',
-  finputfreq in 'finputfreq.pas' {FreqInputForm};
+  finputfreq in 'finputfreq.pas' {FreqInputForm},
+  frb in 'frb.pas';
 
 {$R *.RES}
 
