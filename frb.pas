@@ -44,6 +44,7 @@ end;
 
 Procedure TRelays2.ReleaseMem; // Free stuff allocated @ constructor
 begin
+  com.Open:=false;
   FreeAndNil(q);
   FreeAndNil(com);
   FreeAndNil(lock);
@@ -68,19 +69,33 @@ procedure TRelays2.DataAvail(sender:TObject);
 var i, v:integer;
     data:string;
 begin
- buffer:=buffer+com.ReceiveStr;
+ data:=com.ReceiveStr;
 
- for i:=1 to Length(buffer) do begin
-  if (buffer[i]= ';') then begin
-   data:=Copy(buffer, 1, i-1);
-   delete(buffer, 1, i);
-   v:=StrToIntDef(Trim(data), -1);
-
-   if (v>=0) then self.status:=v;
-
-  end;
+ for i:=1 to length(data) do begin
+   case data[i] of
+    '0'..'9',
+    'A'..'Z',
+    'a'..'z',    
+    ';':
+     begin
+      buffer:=buffer+data[i];
+     end;
+   end;
  end;
 
+ i:=1;
+ while (length(buffer)>0) do
+ begin
+  if (i> length(buffer)) then break;
+  if (buffer[i]= ';') then begin
+   data:=Copy(buffer, 1, i-1);
+   buffer:=copy(buffer, i+1, length(buffer));
+   v:=StrToIntDef(data, -1);
+   if (v>=0) then self.status:=v;
+   i:=0;
+  end;
+  inc(i);
+ end;
 
 end;
 
@@ -108,6 +123,7 @@ begin
  lock.Enter;
  try
   q.PushBack(mode);
+  tickle;
  finally
   lock.Leave;
  end;

@@ -27,6 +27,10 @@ type
     HotCatcher1: THotCatcher;
     ErrTxt: TLabel;
     Misc: TTimer;
+    PopupMenu1: TPopupMenu;
+    N21: TMenuItem;
+    N11: TMenuItem;
+    Real1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -38,6 +42,7 @@ type
       VirtualKey: Integer);
     procedure MiscTimer(Sender: TObject);
     procedure Panel1Click(Sender: TObject);
+    procedure N11Click(Sender: TObject);
   private
     procedure StatusChangeEvent(Sender: TObject; RigNumber: Integer);
     procedure ParamsChangeEvent(Sender: TObject; RigNumber, Params: Integer);
@@ -86,6 +91,9 @@ type
 
     procedure TuneFreq(Delta:Int64);
     procedure NewFreqRequested(freq:Integer);
+
+    procedure TriggerRX(old,new:Int64);
+
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -118,6 +126,8 @@ const
 
   CONST_COM = 7;
 
+var RelAltStatus:integer = 1;
+
 
 procedure TForm1.FormCreate(Sender: TObject);
 var l,t:integer;
@@ -142,7 +152,7 @@ begin
    FreeAndNil(reg);
   end;
 
-  self.Width:=120;
+  self.Width:=170;
   self.height:=60;
 
   relays2:=TRelays2.Create(CONST_COM);
@@ -418,6 +428,23 @@ begin
 end;
 
 
+Function AntName(i:integer):string;
+begin
+  case i of
+    0: result:='Real';
+    1: result:='Real-3dB';
+    2: result:='LoG';
+    3: result:='BoG-1';
+    4: result:='BoG-2';
+    5: result:='BoG-3';
+    6: result:='BoG-4';
+
+   else
+    result:='??';
+  end;
+
+end;
+
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 var needed:boolean;
@@ -450,6 +477,8 @@ begin
     Panel2.Color:=clLime
   else
     Panel2.Color:=clBtnFace;
+
+  Panel2.Caption:=AntName(relays2.status);
 
 end;
 
@@ -491,6 +520,15 @@ begin
  Close;
 end;
 
+procedure TForm1.TriggerRX(old,new:Int64);
+begin
+
+ if (relays2.Status>1) and (PreviousFreq>5.5e6) then begin
+    relays2.Request(0);
+ end;
+
+end;
+
 procedure TForm1.SlowTimerTimer(Sender: TObject);
 const errMsg = 'No IP address for AMP!';
 var freq:Int64;
@@ -508,6 +546,8 @@ begin
    InhibitTXUntil:=xGetTickCount+700;
   end else
    if SlowTimer.Interval<>SlowInt then SlowTimer.Interval:=SlowInt;
+
+  triggerRx(PreviousFreq, freq);
 
   PreviousFreq:=freq;
   if rpi_hostip<>'' then begin
@@ -528,8 +568,12 @@ var _on:boolean;
 begin
 
   if relays2.Status=0 then
-    relays2.Request(1)
-  else
+  begin
+    if PreviousFreq>5.5e6 then
+     relays2.Request(1)
+    else
+     relays2.Request(2);
+  end else
    relays2.Request(0);
 end;
 
@@ -777,6 +821,26 @@ begin
 end;
 
 procedure TForm1.CustomREply(Sender: TObject; RigNumber: Integer; Command: OleVariant; Reply: OleVariant);
+
+ function lookslikefloat(val:string):boolean;
+ var i:integer;
+ begin
+  result:=true;
+  for i:=1 to length(val) do
+  begin
+    case val[i] of
+     '0'..'9', '.':
+       begin
+       end;
+     else
+       result:=false;
+    end;
+  end;
+
+
+
+ end;
+
 var cmd, rep:string;
     ecmd:cardinal;
     r:integer;
@@ -790,7 +854,12 @@ begin
 
    if cmd = 'SS04;' then begin // level
     tmp:=Copy(rep, 5, 5);
-    current_level:=StrToFloat(tmp);
+    if (length(tmp)>0) and lookslikefloat(tmp) then begin
+      try
+       current_level:=StrToFloat(tmp);
+      except
+      end;
+    end;
    end else
    if cmd = 'SS05;' then begin  // span
     tmp:=Copy(rep, 5, 1);
@@ -892,5 +961,16 @@ begin
             OmniRig.Rig1.SendCustomCommand(val, 0, '');
 end;
 
+procedure TForm1.N11Click(Sender: TObject);
+begin
+ if Sender is TMenuItem then begin
+  RelAltStatus:=(Sender as TMenuItem).Tag;
+  if relays2.Status>0 then begin
+   relays2.Request(RelAltStatus);
+  end;
+ end;
+end;
+
 end.
+
 
