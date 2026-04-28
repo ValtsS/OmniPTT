@@ -31,6 +31,10 @@ type
     N21: TMenuItem;
     N11: TMenuItem;
     Real1: TMenuItem;
+    BoG11: TMenuItem;
+    BoG21: TMenuItem;
+    BoG31: TMenuItem;
+    BoG451: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -91,7 +95,7 @@ type
 
     procedure TuneFreq(Delta:Int64);
     procedure NewFreqRequested(freq:Integer);
-
+    procedure SelectAntenna;
     procedure TriggerRX(old,new:Int64);
 
   public
@@ -213,6 +217,8 @@ begin
 
 
   HotCatcher1.RegisterKey(80,  MOD_SHIFT or MOD_CONTROL, VK_F12); // manual freq
+  HotCatcher1.RegisterKey(81,  MOD_ALT, VK_OEM_3); // Antenna switch popup
+  HotCatcher1.RegisterKey(82,  MOD_CONTROL, VK_OEM_3); // Antenna switch to previous mode
 
   freqInput:=TFreqInputForm.Create(self);
   freqInput.OnFreqChange:=NewFreqRequested;
@@ -523,7 +529,7 @@ end;
 procedure TForm1.TriggerRX(old,new:Int64);
 begin
 
- if (relays2.Status>1) and (PreviousFreq>5.5e6) then begin
+ if (relays2.Status>1) and (new>15e6) then begin
     relays2.Request(0);
  end;
 
@@ -781,8 +787,40 @@ begin
           end;
 
         end;
+       81:
+       begin
+         SelectAntenna;
+       end;
+       82:
+       begin
+         relays2.Request(relays2.Previous);
+       end;
+
   end;
 
+end;
+
+procedure TForm1.SelectAntenna;
+var
+  P: TPoint;
+  f, i:integer;
+begin
+
+ f:=-1;
+ for i:=0 to PopupMenu1.Items.Count-1 do begin
+  if PopupMenu1.Items[i].Tag = relays2.Status then begin
+   f:=i+1;
+   break;
+  end;
+ end;
+
+ P := Mouse.CursorPos;
+ SetForegroundWindow(Self.Handle);
+ while (f>0) do begin
+     PostMessage(Self.Handle, WM_KEYDOWN, VK_DOWN, 0);
+     dec(f);
+ end;
+ PopupMenu1.Popup(P.X, P.Y);
 end;
 
 procedure TForm1.NewFreqRequested(freq:Integer);
@@ -965,9 +1003,7 @@ procedure TForm1.N11Click(Sender: TObject);
 begin
  if Sender is TMenuItem then begin
   RelAltStatus:=(Sender as TMenuItem).Tag;
-  if relays2.Status>0 then begin
-   relays2.Request(RelAltStatus);
-  end;
+  relays2.Request(RelAltStatus);
  end;
 end;
 

@@ -16,7 +16,7 @@ type TRelays2 = class(THThread)
   Procedure Manage;
   procedure DataAvail(sender:TObject);
  public
-  Status:integer;
+  Previous, Status:integer;
   Constructor Create(port:integer);
   Destructor Destroy;override;
   procedure Request(mode:byte);
@@ -122,6 +122,7 @@ procedure TRelays2.Request(mode:byte);
 begin
  lock.Enter;
  try
+  Previous:=status;
   q.PushBack(mode);
   tickle;
  finally

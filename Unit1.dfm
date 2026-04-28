@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 483
-  Top = 168
+  Left = 645
+  Top = 203
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsToolWindow
   Caption = 'OmniRig demo'
@@ -52,6 +52,12 @@ object Form1: TForm1
     Height = 146
     Align = alRight
     BevelOuter = bvNone
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
     PopupMenu = PopupMenu1
     TabOrder = 1
     OnClick = Panel2Click
@@ -77,6 +83,26 @@ object Form1: TForm1
   object PopupMenu1: TPopupMenu
     Left = 96
     Top = 24
+    object BoG451: TMenuItem
+      Tag = 6
+      Caption = 'BoG4'
+      OnClick = N11Click
+    end
+    object BoG31: TMenuItem
+      Tag = 5
+      Caption = 'BoG3'
+      OnClick = N11Click
+    end
+    object BoG21: TMenuItem
+      Tag = 4
+      Caption = 'BoG2'
+      OnClick = N11Click
+    end
+    object BoG11: TMenuItem
+      Tag = 3
+      Caption = 'BoG1'
+      OnClick = N11Click
+    end
     object N21: TMenuItem
       Tag = 2
       Caption = 'LoG'
