@@ -90,6 +90,8 @@ type
     freqInput:TFreqInputForm;
     relays2:TRelays2;
 
+    previousFocus:Thandle;
+
     procedure SavePos;
     procedure Lookup;
 
@@ -97,7 +99,7 @@ type
     procedure NewFreqRequested(freq:Integer);
     procedure SelectAntenna;
     procedure TriggerRX(old,new:Int64);
-
+    procedure RestorePreviousFocus;
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -805,6 +807,7 @@ var
   P: TPoint;
   f, i:integer;
 begin
+ previousFocus:=GetForegroundWindow;
 
  f:=-1;
  for i:=0 to PopupMenu1.Items.Count-1 do begin
@@ -821,7 +824,18 @@ begin
      dec(f);
  end;
  PopupMenu1.Popup(P.X, P.Y);
+ RestorePreviousFocus;
 end;
+
+procedure TForm1.RestorePreviousFocus;
+begin
+ if (previousFocus<>0) and (previousFocus<>self.Handle) then
+ begin
+  SetForegroundWindow(previousFocus);
+  previousFocus:=0;
+ end;
+end;
+
 
 procedure TForm1.NewFreqRequested(freq:Integer);
 begin
