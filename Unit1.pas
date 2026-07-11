@@ -16,7 +16,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   OmniRig_TLB, StdCtrls, Spin, ExtCtrls, Menus, wTime, uhook, jwaWinsock2,
   Registry, uconsole, udp, uhotkey, variantutils, uqueue, udnslookup,
-  ustrlist, wsocks, Math, finputfreq, frb;
+  ustrlist, wsocks, Math, finputfreq, frb, uUni, shellapi;
 
 type
   TForm1 = class(TForm)
@@ -91,6 +91,7 @@ type
     relays2:TRelays2;
 
     previousFocus:Thandle;
+    prevmode:RigStatusX;
 
     procedure SavePos;
     procedure Lookup;
@@ -100,6 +101,9 @@ type
     procedure SelectAntenna;
     procedure TriggerRX(old,new:Int64);
     procedure RestorePreviousFocus;
+
+    Function FindSoundView:widestring;
+    procedure SoundViewListen(val:integer);
   public
     OmniRig: TOmniRigX;
     PTTUnti:Int64;
@@ -131,6 +135,9 @@ const
   RPI = 'amp.wnrsoft.lv';
 
   CONST_COM = 7;
+
+  LISTEN = '/SetListenToThisDevice "DX10 In"';
+  SNDVOL = 'SoundVolumeView.exe';
 
 var RelAltStatus:integer = 1;
 
@@ -225,6 +232,51 @@ begin
   freqInput:=TFreqInputForm.Create(self);
   freqInput.OnFreqChange:=NewFreqRequested;
 end;
+
+Function TForm1.FindSoundView:widestring;
+var p:widestring;
+    h:THandle;
+begin
+ p:=ExcludeTrailingBackslashW(ExtractFilePathW(paramstr0w))+'\'+SNDVOL;
+ h:=FileOpenW(p, fmOpenRead or fmShareCompat, 0);
+ if (h = -1) then
+ begin
+  result:='';
+ end else begin
+  FileClose(h);
+  result:=p;
+ end;
+
+end;
+
+procedure TForm1.SoundViewListen(val:integer);
+const SEE_MASK_NOASYNC = $00000100;
+var sei:TShellExecuteInfoW;
+    cmd, ws, params:widestring;
+begin
+ ws:=ExtractFilePathW(FindSoundView);
+ cmd:=ExtractFileNameW(FindSoundView);
+ params:=FormatN('%s %d',[LISTEN, val]);
+
+
+ fillchar(sei, sizeof(sei), 0);
+
+  sei.cbSize:=sizeof(sei);
+   sei.Wnd:=GetDesktopWindow;
+   sei.lpVerb:='open';
+   sei.lpFile:=pwidechar(cmd);
+   sei.lpParameters:=pwidechar(params);
+   sei.lpDirectory:=pwidechar(ws);
+   sei.nShow:=SW_SHOWNOACTIVATE or SW_SHOWMINIMIZED;
+   sei.fMask:=SEE_MASK_NOCLOSEPROCESS;
+
+    if not ShellExecuteExW(@sei) then begin
+      raise Exception.CreateFmt('ShellexecuteExw failed 0x%x',[GetLastError]);
+    end;
+
+end;
+
+
 
 
 
@@ -383,7 +435,17 @@ begin
        dnr_deadline:=xGetTickCount+2000;
        que_dnr.PushBack(3);
        OmniRig.Rig1.SendCustomCommand('NR0;', 0, '');
+
    end;
+
+   if (mode<>prevmode) then begin
+    if (mode =  PM_DIG_U) then
+     SoundViewListen(0)
+    else
+     SoundViewListen(1);
+   end;
+
+   prevmode:=mode;
 
  end;
 
@@ -773,8 +835,10 @@ begin
             end;
           end;
        70:
+       
         begin
            OmniRig.Rig1.SendCustomCommand('AG0;',0,'');
+
 
         end;
        80:
